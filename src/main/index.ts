@@ -29,7 +29,7 @@ function createWindow() {
     width: 1280,
     height: 860,
     show: false,
-    icon: path.join(process.cwd(), 'build/icon.png'),
+    icon: path.join(app.getAppPath(), 'build', 'icon.png'),
     backgroundColor: '#0b0b0b',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -48,7 +48,7 @@ function createWindow() {
   if (devUrl) {
     win.loadURL(devUrl);
   } else {
-    win.loadFile(path.join(__dirname, '../renderer/index.html'));
+    win.loadFile(path.join(__dirname, '../../renderer/index.html'));
   }
 }
 
