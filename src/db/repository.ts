@@ -1,53 +1,60 @@
-import { getDb } from './database';
+import { getDb, nextCommunityId, nextItemId, now, saveDb } from './database';
 import type { Community, Item, ParsedItemInput } from '../types';
 
 export function getCommunities(): Community[] {
-  return getDb().prepare('SELECT * FROM communities ORDER BY created_at DESC').all() as Community[];
+  return [...getDb().communities].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export function upsertCommunity(url: string, name: string): Community {
-  const now = new Date().toISOString();
   const db = getDb();
-  db.prepare('INSERT OR IGNORE INTO communities (url, name, created_at) VALUES (?, ?, ?)').run(url, name, now);
-  db.prepare('UPDATE communities SET name = ? WHERE url = ?').run(name, url);
-  return db.prepare('SELECT * FROM communities WHERE url = ?').get(url) as Community;
+  let community = db.communities.find((c) => c.url === url);
+  if (!community) {
+    community = { id: nextCommunityId(), url, name, created_at: now(), last_checked_at: null };
+    db.communities.push(community);
+  } else {
+    community.name = name;
+  }
+  saveDb();
+  return community;
 }
 
 export function touchCommunityChecked(id: number) {
-  getDb().prepare('UPDATE communities SET last_checked_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+  const community = getDb().communities.find((c) => c.id === id);
+  if (community) community.last_checked_at = now();
+  saveDb();
 }
 
 export function getItemsByCommunity(communityId: number): Item[] {
-  return getDb().prepare('SELECT * FROM items WHERE community_id = ? ORDER BY first_seen_at DESC').all(communityId) as Item[];
+  return getDb().items
+    .filter((i) => i.community_id === communityId)
+    .sort((a, b) => b.first_seen_at.localeCompare(a.first_seen_at));
 }
 
 export function insertOrTouchItems(communityId: number, items: ParsedItemInput[]) {
   const db = getDb();
-  const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO items (community_id, section, item_key, title, text, url, preview_url, published_at, first_seen_at, last_seen_at)
-    VALUES (@communityId, @section, @item_key, @title, @text, @url, @preview_url, @published_at, @first_seen_at, @last_seen_at)
-    ON CONFLICT(item_key) DO UPDATE SET
-      last_seen_at = excluded.last_seen_at,
-      title = COALESCE(excluded.title, items.title),
-      text = COALESCE(excluded.text, items.text),
-      preview_url = COALESCE(excluded.preview_url, items.preview_url)
-  `);
-  const tx = db.transaction(() => {
-    for (const item of items) {
-      insert.run({
-        communityId,
-        section: item.section,
-        item_key: item.itemKey,
-        title: item.title ?? null,
-        text: item.text ?? null,
-        url: item.url ?? null,
-        preview_url: item.previewUrl ?? null,
-        published_at: item.publishedAt ?? null,
-        first_seen_at: now,
-        last_seen_at: now
-      });
+  const ts = now();
+  for (const item of items) {
+    const existing = db.items.find((x) => x.item_key === item.itemKey);
+    if (existing) {
+      existing.last_seen_at = ts;
+      existing.title = item.title ?? existing.title;
+      existing.text = item.text ?? existing.text;
+      existing.preview_url = item.previewUrl ?? existing.preview_url;
+      continue;
     }
-  });
-  tx();
+    db.items.push({
+      id: nextItemId(),
+      community_id: communityId,
+      section: item.section,
+      item_key: item.itemKey,
+      title: item.title ?? null,
+      text: item.text ?? null,
+      url: item.url ?? null,
+      preview_url: item.previewUrl ?? null,
+      published_at: item.publishedAt ?? null,
+      first_seen_at: ts,
+      last_seen_at: ts
+    });
+  }
+  saveDb();
 }

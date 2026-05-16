@@ -1,6 +1,6 @@
 {
   "name": "community-watcher",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Community Watcher Windows desktop app",
   "main": "dist/main/index.js",
   "author": "",
@@ -16,10 +16,11 @@
     "dist": "cross-env PLAYWRIGHT_BROWSERS_PATH=0 npm run build && electron-builder --win nsis portable --x64",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "clean": "node scripts/clean.mjs",
-    "prepare:assets": "node scripts/generate-assets.mjs"
+    "prepare:assets": "node scripts/generate-assets.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "setup:portable-node": "node scripts/setup-portable-node.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "^9.6.0",
     "electron": "^31.0.2",
     "playwright": "^1.54.2",
     "react": "^18.3.1",
@@ -51,14 +52,15 @@
     ],
     "asarUnpack": [
       "node_modules/playwright/**/*",
-      "node_modules/playwright-core/**/*",
-      "node_modules/better-sqlite3/**/*"
+      "node_modules/playwright-core/**/*"
     ],
     "extraResources": [
       {
         "from": "node_modules/playwright-core/.local-browsers",
         "to": "playwright-browsers",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "directories": {
@@ -67,8 +69,18 @@
     "win": {
       "icon": "build/icon.png",
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "portable": {
@@ -83,5 +95,8 @@
       "shortcutName": "Community Watcher",
       "artifactName": "CommunityWatcherSetup.${ext}"
     }
+  },
+  "engines": {
+    "node": ">=24 <25"
   }
 }

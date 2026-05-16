@@ -1,36 +1,54 @@
-import Database from 'better-sqlite3';
-import path from 'node:path';
 import { app } from 'electron';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import path from 'node:path';
+import type { Community, Item } from '../types';
 
-let db: Database.Database;
+interface DbShape {
+  communities: Community[];
+  items: Item[];
+  counters: { community: number; item: number };
+}
+
+let state: DbShape | null = null;
+let dbPath = '';
+
+function now() {
+  return new Date().toISOString();
+}
+
+function bootstrap(): DbShape {
+  return { communities: [], items: [], counters: { community: 0, item: 0 } };
+}
 
 export function getDb() {
-  if (db) return db;
-  const dbPath = path.join(app.getPath('userData'), 'community-watcher.sqlite');
-  db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.exec(`
-  CREATE TABLE IF NOT EXISTS communities (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    last_checked_at TEXT
-  );
-  CREATE TABLE IF NOT EXISTS items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    community_id INTEGER NOT NULL,
-    section TEXT NOT NULL,
-    item_key TEXT NOT NULL UNIQUE,
-    title TEXT,
-    text TEXT,
-    url TEXT,
-    preview_url TEXT,
-    published_at TEXT,
-    first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    FOREIGN KEY(community_id) REFERENCES communities(id)
-  );
-  `);
-  return db;
+  if (state) return state;
+  const dir = app.getPath('userData');
+  mkdirSync(dir, { recursive: true });
+  dbPath = path.join(dir, 'community-watcher.db.json');
+  if (!existsSync(dbPath)) {
+    state = bootstrap();
+    writeFileSync(dbPath, JSON.stringify(state, null, 2), 'utf-8');
+    return state;
+  }
+  state = JSON.parse(readFileSync(dbPath, 'utf-8')) as DbShape;
+  return state;
 }
+
+export function saveDb() {
+  if (!state) return;
+  writeFileSync(dbPath, JSON.stringify(state, null, 2), 'utf-8');
+}
+
+export function nextCommunityId() {
+  const db = getDb();
+  db.counters.community += 1;
+  return db.counters.community;
+}
+
+export function nextItemId() {
+  const db = getDb();
+  db.counters.item += 1;
+  return db.counters.item;
+}
+
+export { now };
