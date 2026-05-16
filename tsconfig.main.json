@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "outDir": "dist/main",
+    "types": ["node"]
+  },
+  "include": ["src/main", "src/parser", "src/db", "src/services", "src/types"]
+}
